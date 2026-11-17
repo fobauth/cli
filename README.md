@@ -7,13 +7,13 @@ Command line client for [Fob](https://fobauth.com). It runs every operation of t
 Linux and macOS:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/fobauth/cli/main/install.sh | sh
+curl -fsSL https://fob.so/install.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/fobauth/cli/main/install.ps1 | iex
+irm https://fob.so/install.ps1 | iex
 ```
 
 Both download the latest [release](https://github.com/fobauth/cli/releases/latest) and check it against the release's `SHA256SUMS` before installing. `install.sh` installs to `~/.local/bin`, or to `FOB_INSTALL_DIR` if you set it. `install.ps1` installs to `%LOCALAPPDATA%\Programs\fob` and adds that to your PATH.
