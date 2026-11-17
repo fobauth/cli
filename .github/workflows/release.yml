@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.ref_name }}
+  GH_REPO: ${{ github.repository }}
+  RUST_VERSION: "1.99"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  draft:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tag matches the version in Cargo.toml
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::Tag $TAG doesn't match version $version in Cargo.toml."
+            exit 1
+          fi
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$draft" != true ]; then
+              echo "::error::$TAG is already released."
+              exit 1
+            fi
+            exit 0
+          fi
+          gh release create "$TAG" --draft --verify-tag --title "$TAG" --generate-notes
+
+  build:
+    needs: draft
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-24.04
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+          - target: aarch64-apple-darwin
+            os: macos-15
+          - target: x86_64-pc-windows-msvc
+            os: windows-2025
+    runs-on: ${{ matrix.os }}
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal --target "$TARGET"
+          rustup default "$RUST_VERSION"
+      # aws-lc-sys compiles C, so the musl targets need a musl C compiler.
+      - name: Install the musl C compiler
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install --yes musl-tools
+      - run: cargo build --release --locked --target "$TARGET"
+      - name: The binary runs
+        run: |
+          "target/$TARGET/release/fob" --version
+      - name: Package
+        if: runner.os != 'Windows'
+        run: tar -czf "fob-$TARGET.tar.gz" -C "target/$TARGET/release" fob
+      - name: Package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "target/$env:TARGET/release/fob.exe" -DestinationPath "fob-$env:TARGET.zip"
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" fob-"$TARGET".* --clobber
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Write SHA256SUMS
+        run: |
+          gh release download "$TAG" --dir dist --pattern 'fob-*'
+          cd dist
+          set -- fob-*
+          test "$#" -eq 5
+          sha256sum "$@" > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "$TAG" SHA256SUMS --clobber
+      # install.sh and install.ps1 download from the latest release, so a tag
+      # like v1.2.0-rc.1 is published as a prerelease and never becomes it.
+      - name: Publish
+        run: |
+          case "$TAG" in
+            *-*) gh release edit "$TAG" --draft=false --prerelease ;;
+            *) gh release edit "$TAG" --draft=false --latest ;;
+          esac
