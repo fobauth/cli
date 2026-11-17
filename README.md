@@ -10,10 +10,10 @@ Linux and macOS:
 curl -fsSL https://fob.so/install.sh | sh
 ```
 
-Windows (PowerShell):
+Windows:
 
-```powershell
-irm https://fob.so/install.ps1 | iex
+```
+powershell -c "irm https://fob.so/install.ps1 | iex"
 ```
 
 Both download the latest [release](https://github.com/fobauth/cli/releases/latest) and check it against the release's `SHA256SUMS` before installing. `install.sh` installs to `~/.local/bin`, or to `FOB_INSTALL_DIR` if you set it. `install.ps1` installs to `%LOCALAPPDATA%\Programs\fob` and adds that to your PATH.
