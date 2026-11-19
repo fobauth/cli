@@ -130,7 +130,7 @@ const COLUMNS: &[(&str, &[&str])] = &[
         "list_api_keys",
         &["name", "prefix", "scopes", "last_used_at", "expires_at"],
     ),
-    ("list_apps", &["name", "kind", "access", "client_id"]),
+    ("list_apps", &["name", "kind", "everyone", "client_id"]),
     (
         "list_audit_log",
         &["created_at", "actor_email", "action", "ip"],
@@ -162,7 +162,7 @@ const COLUMNS: &[(&str, &[&str])] = &[
         "list_sign_on_policies",
         &["name", "rules", "apps", "is_default"],
     ),
-    ("list_sign_on_rules", &["name", "action", "require_mfa"]),
+    ("list_sign_on_rules", &["name", "requires", "expression"]),
     (
         "list_signing_keys",
         &["kid", "status", "algorithm", "created_at"],
